@@ -1,0 +1,27 @@
+apiVersion: networking.istio.io/v1alpha3
+kind: DestinationRule
+metadata:
+  name: myapp
+spec:
+  host: version1
+  trafficPolicy:
+    tls:
+      mode: ISTIO_MUTUAL
+
+  subsets:
+  - name: v1
+    labels:
+      app: ballerina_app_v1
+    trafficPolicy:
+      loadBalancer:
+        simple: ROUND_ROBIN
+
+
+  - name: v2
+    labels:
+      app: ballerina_app_v2
+    trafficPolicy:
+      loadBalancer:
+        simple: ROUND_ROBIN
+
+
