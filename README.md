@@ -8,8 +8,8 @@
     
     2.  Follow the instructions to add Istio variables on $PATH
     
-    3.  kubectl apply -f install/kubernetes/helm/istio/templates/crds.yaml
-    
+    3.   for i in install/kubernetes/helm/istio-init/files/crd*yaml; do kubectl apply -f $i; done
+
     4.  kubectl apply -f install/kubernetes/istio-demo-auth.yaml
     
     5.  kubectl get svc -n istio-system | grep -i ingress
@@ -25,7 +25,7 @@
     
     2.  Dockerfile is provided for the app. You can build your own image or just run the below command to run the Pod from my repo. 
     
-    3.  kubectl run curlapp --image=harshal0812/curlapp:latest --port=9090 
+    3.  kubectl run curlapp --image=harshal0812/curl_app_v1 --port=9090 
     
     4.  The port 9090 is where our demo deployment will run. 
     
@@ -47,37 +47,51 @@
         b.  ballerina_app_v2.yaml  -- application on Version v2 
         
         
-    2.  kubectl create -f ballerina_app_v1.yaml -f ballerina_app_v2.yaml 
+    2.  kubectl create -f ballerina_app_v1.yaml -f ballerina_app_v2.yaml
+    
+    3.  Its important to note the below points - 
+    
+        a.  There is 1 service with the name version1 that has the selector : type: "myapp"
+        
+        b.  There are 2 deployments. The pod metadata has the label type: "myapp"
+        
+        c.  There is one additional label assigned to both the deployment-
+             
+             app: "ballerina_app_v1"  -- for version1 deployment
+             
+             app: "ballerina_app_v2"  -- for version2 deployment
+             
+             The service will not select this label as we have defined the selector as ONLY type: "myapp"
     
     3.  kubectl get pods
         
         ballerinav1deployment-b75859b9b-mrrbs    2/2     Running   0          10m
         
         ballerinav2deployment-5d79454d5d-fsq6l   2/2     Running   0          10m
+        
+        
+    4.  kubectl get svc 
+    
+        version1     NodePort    10.111.65.134   <none>        9090:31505/TCP   93m
 
-    4.  Expose any one pod - kubectl expose pod ballerinav1deployment-b75859b9b-mrrbs --type=NodePort
+##  Get the Ingress Gateway port 
+
+    export INGRESS_PORT=$(kubectl -n istio-system get service istio-ingressgateway -o jsonpath='{.spec.ports[?(@.name=="http2")].nodePort}')
     
-    5.  Edit the service to incorporate both deployments -
-        
-        kubectl edit svc ballerinav1deployment-b75859b9b-mrrbs
-        
-        Remove the below from labels and selectors- 
-        
-        pod-template-hash: b75859b9b
-        
-        version: v1
-        
-        
+    Alternatively you can just get the HTTP port using. 
     
-    6.  Send request from curlapp to our application service myapp
+    kubectl get svc -n istio-system | grep -i ingressgateway
     
-    7.  As a part of our application - The request should be sent to /api/apiPayload to get a response
+##  Use the curlapp to hit the service 
+
+    kubectl exec -it {{CURL APP POD NAME}} -c {{CURL APP CONTAINER}} -- curl {{SERVICE_IP}}:9090/v1/sayHello
     
-    8.  kubectl exec -it  curlapp-98f7c878c-dmckl -c curlapp -- curl  http://ballerinav1deployment-b75859b9b-mrrbs:9090/api/apiPayload
+    outputs - 
     
-        Hello, This is the output of application on Version V1 ! 
-        
-        Hello, This is the output of application on Version V2 ! 
+    Hello, This is the output of application on Version V1 ! ---coming from deployment1
+
+    Hello, This is the output of application on Version V2!  ---coming from deployment2 
+
 
 ##  Create Istio Gateway / VirtualService / destinationrule
 
@@ -87,12 +101,30 @@
     
     3.  kubectl apply -f gateway.yaml -f destinationrule.yaml -f virtualservice.yaml 
     
-    4.  Get the ingress port - 
-    
-        export INGRESS_PORT=$(kubectl -n istio-system get service istio-ingressgateway -o jsonpath='{.spec.ports[?(@.name=="http2")].nodePort}')
+        gateway.yaml - This is the default gateway that maps to IngressGateway
         
-    5.  Run a loop on one terminal
-      
+        destinationrule.yaml - This defines the subset for both the deployments. 
+            
+            Things to note -
+            
+            This rule defines what happens after routing has taken place from the service. 
+            
+            Subset v1 - points to app: ballerina_app_v1
+            
+            Subset v2 - points to app: ballerina_app_v2 
+            
+            Once routing occours - the traffic will be routed to the pods that matches any one of the above labels 
+            
+        virtualservice.yaml - This defines the routing rules and the corresponding destinations. 
+            
+            The weight resource determines the percentage of traffic that will be routed to the subset. 
+    
+    4.  Since our ingress gateway is nodeport - you can use ip address of any host within your cluster to access the app
+    
+    5.  curl {{MASTER_IP_ADDRESS}}:${INGRESS_PORT}/v1/sayHello 
+    
+    6.  In the virtualservice.yaml - change the weight to perform blue-green / Canary deployments 
+   
 
 
     
