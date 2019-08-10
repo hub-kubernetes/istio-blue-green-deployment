@@ -19,60 +19,33 @@
     7.  kubectl label namespace default istio-injection=enabled --overwrite
 
     
-##  Install Application that will perform action on our dummy deployment
-
-    1.  We have an alpine image that has curl installed. This application can ping our main deployment to simulate request/response
-    
-    2.  Dockerfile is provided for the app. You can build your own image or just run the below command to run the Pod from my repo. 
-    
-    3.  kubectl run curlapp --image=harshal0812/curl_app_v1 --port=9090 
-    
-    4.  The port 9090 is where our demo deployment will run. 
-    
-    5.  curlapp-98f7c878c-dmckl   2/2     Running   0          9s   --- 2 containers as istio injected envoy proxy
-    
-    6.  Expose the deployment as NodePort - kubectl expose deployment curlapp --type=NodePort
-    
-    7.  kubectl get svc
-        
-        curlapp      NodePort    10.101.22.66   <none>        9090:30974/TCP   27s
-
 
 ##  Install the application deployments 
 
     1.  There are 3 files in this repo -
     
-        a.  ballerina_app_v1.yaml  -- application on Version v1
+        a.  app1.yaml  -- application on Version v1
         
-        b.  ballerina_app_v2.yaml  -- application on Version v2 
+        b.  app2.yaml  -- application on Version v2 
         
         
-    2.  kubectl create -f ballerina_app_v1.yaml -f ballerina_app_v2.yaml
+    2.  kubectl create -f app1.yaml -f app2.yaml
     
-    3.  Its important to note the below points - 
+    3.  kubectl create -f service.yaml
     
-        a.  There is 1 service with the name version1 that has the selector : type: "myapp"
-        
-        b.  There are 2 deployments. The pod metadata has the label type: "myapp"
-        
-        c.  There is one additional label assigned to both the deployment-
-             
-             app: "ballerina_app_v1"  -- for version1 deployment
-             
-             app: "ballerina_app_v2"  -- for version2 deployment
-             
-             The service will not select this label as we have defined the selector as ONLY type: "myapp"
-    
-    3.  kubectl get pods
-        
-        ballerinav1deployment-b75859b9b-mrrbs    2/2     Running   0          10m
-        
-        ballerinav2deployment-5d79454d5d-fsq6l   2/2     Running   0          10m
+    3.  kubectl get pods 
+        NAME                          READY   STATUS    RESTARTS   AGE
+        nginx-app1-7fb695b558-2jg7b   2/2     Running   0          7m2s
+        nginx-app1-7fb695b558-2wldm   2/2     Running   0          7m2s
+        nginx-app1-7fb695b558-7kzwl   2/2     Running   0          7m2s
+        nginx-app2-564f858694-g6h2z   2/2     Running   0          7m2s
+        nginx-app2-564f858694-jn4g7   2/2     Running   0          7m2s
+        nginx-app2-564f858694-mdrxb   2/2     Running   0          7m1s
         
         
-    4.  kubectl get svc 
-    
-        version1     NodePort    10.111.65.134   <none>        9090:31505/TCP   93m
+    4.  kubectl get svc
+        NAME         TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)   AGE
+        appservice   ClusterIP   10.104.184.47   <none>        80/TCP    7m4s
 
 ##  Get the Ingress Gateway port 
 
@@ -82,15 +55,7 @@
     
     kubectl get svc -n istio-system | grep -i ingressgateway
     
-##  Use the curlapp to hit the service 
 
-    kubectl exec -it {{CURL APP POD NAME}} -c {{CURL APP CONTAINER}} -- curl {{SERVICE_IP}}:9090/v1/sayHello
-    
-    outputs - 
-    
-    Hello, This is the output of application on Version V1 ! ---coming from deployment1
-
-    Hello, This is the output of application on Version V2!  ---coming from deployment2 
 
 
 ##  Create Istio Gateway / VirtualService / destinationrule
@@ -109,9 +74,9 @@
             
             This rule defines what happens after routing has taken place from the service. 
             
-            Subset v1 - points to app: ballerina_app_v1
+            Subset v1 - points to app1
             
-            Subset v2 - points to app: ballerina_app_v2 
+            Subset v2 - points to app2
             
             Once routing occours - the traffic will be routed to the pods that matches any one of the above labels 
             
@@ -121,7 +86,7 @@
     
     4.  Since our ingress gateway is nodeport - you can use ip address of any host within your cluster to access the app
     
-    5.  curl {{MASTER_IP_ADDRESS}}:${INGRESS_PORT}/v1/sayHello 
+    5.  curl {{MASTER_IP_ADDRESS}}:${INGRESS_PORT}/app
     
     6.  In the virtualservice.yaml - change the weight to perform blue-green / Canary deployments 
    
