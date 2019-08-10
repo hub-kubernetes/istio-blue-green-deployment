@@ -1,17 +1,17 @@
 apiVersion: networking.istio.io/v1alpha3
 kind: DestinationRule
 metadata:
-  name: myapp
+  name: appservice
 spec:
-  host: version1
+  host: appservice
   trafficPolicy:
     tls:
-      mode: ISTIO_MUTUAL
+      mode: DISABLE
 
   subsets:
   - name: v1
     labels:
-      app: ballerina_app_v1
+      version: version1
     trafficPolicy:
       loadBalancer:
         simple: ROUND_ROBIN
@@ -19,7 +19,7 @@ spec:
 
   - name: v2
     labels:
-      app: ballerina_app_v2
+      version: version2
     trafficPolicy:
       loadBalancer:
         simple: ROUND_ROBIN

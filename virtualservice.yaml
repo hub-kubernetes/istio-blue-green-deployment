@@ -10,13 +10,15 @@ spec:
   http:
     - match:
         - uri: 
-            exact: /v1/sayHello
+            exact: "/app"
+      rewrite:
+        uri: /
       route:
       - destination:
-          host: version1
+          host: appservice
           subset: v1
-        weight: 80
+        weight: 0
       - destination:
-          host: version1
+          host: appservice
           subset: v2
-        weight: 20      
+        weight: 100      
